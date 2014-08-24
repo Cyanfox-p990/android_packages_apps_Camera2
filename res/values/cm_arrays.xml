@@ -75,16 +75,17 @@
         -->
     </string-array>
 
+    <!-- 0 is off, 1 is auto, specific values are in microseconds -->
     <string-array name="pref_camera_slow_shutter_entryvalues" translatable="false">
-        <item>slow-shutter-off</item>
-        <item>slow-shutter-auto</item>
+        <item>0</item>
+        <item>1</item>
         <!--
-        <item>slow-shutter-1/2s</item>
-        <item>slow-shutter-1s</item>
-        <item>slow-shutter-2s</item>
-        <item>slow-shutter-4s</item>
-        <item>slow-shutter-8s</item>
-       -->
+        <item>500000</item>
+        <item>1000000</item>
+        <item>2000000</item>
+        <item>4000000</item>
+        <item>8000000</item>
+        -->
     </string-array>
 
     <string-array name="pref_camera_slow_shutter_icons" translatable="false">
@@ -107,6 +108,9 @@
         <item>@string/camera_menu_slow_shutter_label</item>
     </string-array>
 
+    <!-- Automatic scene detection -->
+
+    <!-- String values of detected scenes -->
     <string-array name="camera_asd_values" translatable="false">
         <item>indoor</item>
         <item>landscape</item>
@@ -115,8 +119,10 @@
         <item>night</item>
         <item>portrait</item>
         <item>sports</item>
+        <item>normal</item>
     </string-array>
 
+    <!-- Corresponding icons -->
     <string-array name="camera_asd_icons" translatable="false">
         <item>@drawable/smart_scene_indoor</item>
         <item>@drawable/smart_scene_landscape</item>
@@ -125,6 +131,7 @@
         <item>@drawable/smart_scene_night</item>
         <item>@drawable/smart_scene_portrait</item>
         <item>@drawable/smart_scene_sports</item>
+        <item />
     </string-array>
 
     <string-array name="pref_camera_asd_labels" translatable="false">

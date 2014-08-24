@@ -80,6 +80,7 @@ public class CameraSettings {
     public static final String KEY_PHOTOSPHERE_PICTURESIZE = "pref_photosphere_picturesize_key";
     public static final String KEY_STARTUP_MODULE_INDEX = "camera.startup_module";
     public static final String KEY_STORAGE = "pref_camera_storage_key";
+    public static final String KEY_SUPERZOOM = "pref_camera_superzoom";
 
     public static final String KEY_POWER_SHUTTER = "pref_power_shutter";
     public static final String KEY_VIDEO_ENCODER = "pref_camera_videoencoder_key";
@@ -145,8 +146,8 @@ public class CameraSettings {
     public static final String VALUE_ON = "on";
     public static final String VALUE_OFF = "off";
 
-    public static final int CURRENT_VERSION = 5;
-    public static final int CURRENT_LOCAL_VERSION = 2;
+    public static final int CURRENT_VERSION = 7;
+    public static final int CURRENT_LOCAL_VERSION = 3;
 
     public static final int DEFAULT_VIDEO_DURATION = 0; // no limit
     private static final int MMS_VIDEO_DURATION = (CamcorderProfile.get(CamcorderProfile.QUALITY_LOW) != null) ?
@@ -159,6 +160,11 @@ public class CameraSettings {
     private final Parameters mParameters;
     private final CameraInfo[] mCameraInfo;
     private final int mCameraId;
+
+    // Returned by QC's metadata callback
+    public static final int META_DATA_ASD = 1;
+    public static final int META_DATA_FD  = 2;
+    public static final int META_DATA_HDR = 3;
 
     public CameraSettings(Activity activity, Parameters parameters,
                           int cameraId, CameraInfo[] cameraInfo) {
@@ -290,7 +296,7 @@ public class CameraSettings {
         return split(str);
     }
 
-    private void qcomInitPreferences(PreferenceGroup group){
+    private void qcomInitPreferences(PreferenceGroup group) {
         //Qcom Preference add here
         ListPreference powerMode = group.findPreference(KEY_POWER_MODE);
         ListPreference colorEffect = group.findPreference(KEY_COLOR_EFFECT);
@@ -370,12 +376,16 @@ public class CameraSettings {
                         mParameters.getSupportedPictureSizes()));
         }
 
-        if (histogram!= null) {
-            filterUnsupportedOptions(group,
-                    histogram, mParameters.getSupportedHistogramModes());
+        if (histogram != null) {
+            if (CameraUtil.isHistogramEnabled()) {
+                filterUnsupportedOptions(group,
+                        histogram, mParameters.getSupportedHistogramModes());
+            } else {
+                removePreference(group, histogram.getKey());
+            }
         }
 
-        if (pictureFormat!= null) {
+        if (pictureFormat != null) {
             filterUnsupportedOptions(group,
                     pictureFormat, getSupportedPictureFormatLists());
         }
@@ -424,6 +434,7 @@ public class CameraSettings {
         ListPreference slowShutter = group.findPreference(KEY_SLOW_SHUTTER);
         ListPreference asd = group.findPreference(KEY_ASD);
         ListPreference storage = group.findPreference(KEY_STORAGE);
+        ListPreference superZoom = group.findPreference(KEY_SUPERZOOM);
 
         // Since the screen could be loaded from different resources, we need
         // to check if the preference is available here
@@ -496,6 +507,9 @@ public class CameraSettings {
         }
         if (storage != null) {
             buildStorage(group, storage);
+        }
+        if (superZoom != null && !isSuperZoomSupported(mParameters)) {
+            removePreference(group, superZoom.getKey());
         }
         qcomInitPreferences(group);
     }
@@ -711,6 +725,27 @@ public class CameraSettings {
             // ignore the current settings.
             editor.remove("pref_camera_videoquality_key");
             editor.remove("pref_camera_video_duration_key");
+            version = 4;
+        }
+        if (version == 4) {
+            // Just upgrade to version 5 directly
+            version = 5;
+        }
+        if (version == 5) {
+            // Just upgrade to version 6 directly
+            version = 6;
+        }
+        if (version == 6) {
+            // Change jpeg quality {normal,fine,superfine} back to {65,75,85}
+            String quality = pref.getString(KEY_JPEG_QUALITY, "superfine");
+            if (quality.equals("normal")) {
+                quality = "65";
+            } else if (quality.equals("fine")) {
+                quality = "75";
+            } else {
+                quality = "85";
+            }
+            editor.putString(KEY_JPEG_QUALITY, quality);
         }
 
         editor.putInt(KEY_VERSION, CURRENT_VERSION);
@@ -932,7 +967,7 @@ public class CameraSettings {
     }
 
     public static List<String> getSupportedSlowShutter(Parameters params) {
-        String p = params.get("slow-shutter-values");
+        String p = params.get("exposure-time-values");
         if (p != null) {
             return Arrays.asList(p.split(","));
         }
@@ -941,13 +976,32 @@ public class CameraSettings {
 
     public static void setSlowShutter(Parameters params, String value) {
         if (getSupportedSlowShutter(params) != null) {
-            params.set("slow-shutter", value);
+            params.set("exposure-time", value);
         }
     }
 
     public static boolean isSlowShutterEnabled(Parameters params) {
         return (getSupportedSlowShutter(params) != null) &&
-                !"slow-shutter-off".equals(params.get("slow-shutter"));
+                !"0".equals(params.get("exposure-time"));
     }
 
+    public static boolean useZSLBurst(Parameters params) {
+        return CameraUtil.isZSLEnabled() &&
+                params.get("num-snaps-per-shutter") != null;
+    }
+
+    public static void setSuperZoom(Parameters params, boolean on) {
+        if (isSuperZoomSupported(params)) {
+            params.set("high-resolution", on ? "1" : "0");
+        }
+    }
+
+    public static boolean isSuperZoomSupported(Parameters params) {
+        return params.get("high-resolution") != null;
+    }
+
+    public static boolean isSuperZoomEnabled(Parameters params) {
+        return isSuperZoomSupported(params) &&
+            !"0".equals(params.get("high-resolution"));
+    }
 }

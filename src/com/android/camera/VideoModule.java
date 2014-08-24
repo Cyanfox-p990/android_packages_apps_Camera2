@@ -536,7 +536,7 @@ public class VideoModule implements CameraModule,
             }
 
             // Check if metering area or focus area is supported.
-            if (mFocusAreaSupported || mMeteringAreaSupported) {
+            if ((mFocusAreaSupported || mMeteringAreaSupported) && !mSnapshotInProgress) {
                 mFocusManager.onSingleTapUp(x, y);
             }
         }
@@ -1369,7 +1369,6 @@ public class VideoModule implements CameraModule,
         }
         mMediaRecorder = new MediaRecorder();
 
-        setupMediaRecorderPreviewDisplay();
         // Unlock the camera object before passing it to media recorder.
         mCameraDevice.unlock();
         mMediaRecorder.setCamera(mCameraDevice.getCamera());
@@ -1387,6 +1386,7 @@ public class VideoModule implements CameraModule,
         mProfile.duration = mMaxVideoDurationInMs;
 
         mMediaRecorder.setProfile(mProfile);
+        mMediaRecorder.setVideoSize(mProfile.videoFrameWidth, mProfile.videoFrameHeight);
         mMediaRecorder.setMaxDuration(mMaxVideoDurationInMs);
         if (mCaptureTimeLapse) {
             double fps = 1000 / (double) mTimeBetweenTimeLapseFrameCaptureMs;
@@ -1435,6 +1435,7 @@ public class VideoModule implements CameraModule,
             }
         }
         mMediaRecorder.setOrientationHint(rotation);
+        setupMediaRecorderPreviewDisplay();
 
         try {
             mMediaRecorder.prepare();
@@ -1966,18 +1967,18 @@ public class VideoModule implements CameraModule,
         }
 
         // Set High Frame Rate.
-        String HighFrameRate = mPreferences.getString(
+        String highFrameRate = mPreferences.getString(
             CameraSettings.KEY_VIDEO_HIGH_FRAME_RATE,
             mActivity. getString(R.string.pref_camera_hfr_default));
-        if(!("off".equals(HighFrameRate))){
+        if(!("off".equals(highFrameRate))){
             mUnsupportedHFRVideoSize = true;
             String hfrsize = videoWidth+"x"+videoHeight;
             Log.v(TAG, "current set resolution is : "+hfrsize);
             try {
                 Size size = null;
-                if (isSupported(HighFrameRate,mParameters.getSupportedVideoHighFrameRateModes())) {
+                if (isSupported(highFrameRate,mParameters.getSupportedVideoHighFrameRateModes())) {
                     int index = mParameters.getSupportedVideoHighFrameRateModes().indexOf(
-                        HighFrameRate);
+                        highFrameRate);
                     size = mParameters.getSupportedHfrSizes().get(index);
                 }
                 if (size != null) {
@@ -1997,12 +1998,13 @@ public class VideoModule implements CameraModule,
             if(mVideoEncoder != MediaRecorder.VideoEncoder.H264)
                 mUnsupportedHFRVideoCodec = true;
         }
-        if (isSupported(HighFrameRate,
+        if (isSupported(highFrameRate,
                 mParameters.getSupportedVideoHighFrameRateModes()) &&
                 !mUnsupportedHFRVideoSize) {
-            mParameters.setVideoHighFrameRate(HighFrameRate);
-            } else
+            mParameters.setVideoHighFrameRate(highFrameRate);
+        } else {
             mParameters.setVideoHighFrameRate("off");
+        }
 
         // Read Flip mode from adb command
         //value: 0(default) - FLIP_MODE_OFF
@@ -2060,6 +2062,7 @@ public class VideoModule implements CameraModule,
     private void setCameraParameters() {
         Log.d(TAG,"Preview dimension in App->"+mDesiredPreviewWidth+"X"+mDesiredPreviewHeight);
         mParameters.setPreviewSize(mDesiredPreviewWidth, mDesiredPreviewHeight);
+        mParameters.set("video-size", mProfile.videoFrameWidth+"x"+mProfile.videoFrameHeight);
         int[] fpsRange = CameraUtil.getMaxPreviewFpsRange(mParameters);
         if (fpsRange.length > 0) {
             mParameters.setPreviewFpsRange(
@@ -2157,7 +2160,17 @@ public class VideoModule implements CameraModule,
 
         CameraUtil.dumpParameters(mParameters);
 
+        boolean flag = false;
+        if (mPreviewing) {
+            stopPreview();
+            flag = true;
+        }
+
         mCameraDevice.setParameters(mParameters);
+
+        if (flag) {
+            startPreview();
+        }
 
         // Keep preview size up to date.
         mParameters = mCameraDevice.getParameters();
